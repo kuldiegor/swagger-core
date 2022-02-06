@@ -1,16 +1,6 @@
 package io.swagger.v3.core.jackson;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIdentityReference;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
-import com.fasterxml.jackson.annotation.JsonValue;
-import com.fasterxml.jackson.annotation.JsonView;
-import com.fasterxml.jackson.annotation.ObjectIdGenerator;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.databind.AnnotationIntrospector;
 import com.fasterxml.jackson.databind.BeanDescription;
 import com.fasterxml.jackson.databind.JavaType;
@@ -76,6 +66,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1554,7 +1546,7 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
     }
 
     protected Object resolveExample(Annotated a, Annotation[] annotations, io.swagger.v3.oas.annotations.media.Schema schema) {
-
+        // TODO: 30.01.2022 Реализовать format example для LocalDateTime
         if (schema != null) {
             if (!schema.example().isEmpty()) {
                 try {
@@ -1563,10 +1555,47 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                 } catch (IOException e) {
                     return schema.example();
                 }
+            } else {
+                if (a!=null && a.getType()!=null) {
+                    PrimitiveType primitiveType = PrimitiveType.fromType(a.getType());
+                    if (primitiveType == PrimitiveType.DATE_TIME
+                            || primitiveType == PrimitiveType.DATE
+                            || primitiveType == PrimitiveType.PARTIAL_TIME) {
+                        return resolveJavaTimeExampleByAnnotationPattern(a, annotations, schema);
+                    }
+                }
             }
         }
 
         return null;
+    }
+
+    protected String resolveJavaTimeExampleByAnnotationPattern(Annotated a, Annotation[] annotations, io.swagger.v3.oas.annotations.media.Schema schema){
+        ZonedDateTime exampleZonedDateTime = ZonedDateTime.ofInstant(Instant.EPOCH,ZoneId.of("Europe/London")).withHour(1).withMinute(1).withSecond(1).withNano(1001001);
+        String pattern = Arrays.stream(annotations)
+                .filter(it -> it instanceof JsonFormat)
+                .findFirst()
+                .map(it -> (JsonFormat)it)
+                .map(JsonFormat::pattern)
+                .orElse(null);
+        if (pattern==null){
+            if (a.getRawType()==OffsetDateTime.class){
+                return exampleZonedDateTime.toOffsetDateTime().toString();
+            } else if (a.getRawType()==LocalDateTime.class){
+                return exampleZonedDateTime.toLocalDateTime().toString();
+            } else if (a.getRawType()==LocalDate.class){
+                return exampleZonedDateTime.toLocalDateTime().toLocalDate().toString();
+            } else if (a.getRawType()==LocalTime.class){
+                return exampleZonedDateTime.toLocalDateTime().toLocalTime().toString();
+            } else {
+                return exampleZonedDateTime.toString();
+            }
+        }
+        try {
+            return DateTimeFormatter.ofPattern(pattern).format(exampleZonedDateTime);
+        } catch (DateTimeException e){
+            return exampleZonedDateTime.toString();
+        }
     }
 
     protected io.swagger.v3.oas.annotations.media.Schema.AccessMode resolveAccessMode(BeanPropertyDefinition propDef, JavaType type, io.swagger.v3.oas.annotations.media.Schema schema) {
@@ -1701,10 +1730,30 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
     }
 
     protected String resolvePattern(Annotated a, Annotation[] annotations, io.swagger.v3.oas.annotations.media.Schema schema) {
-        if (schema != null && StringUtils.isNotBlank(schema.pattern())) {
-            return schema.pattern();
+        if (schema != null) {
+            if (StringUtils.isNotBlank(schema.pattern())) {
+                return schema.pattern();
+            } else {
+                if (a!=null && a.getType()!=null) {
+                    PrimitiveType primitiveType = PrimitiveType.fromType(a.getType());
+                    if (primitiveType == PrimitiveType.DATE_TIME
+                            || primitiveType == PrimitiveType.DATE
+                            || primitiveType == PrimitiveType.PARTIAL_TIME) {
+                        return resolveJavaTimePatternByAnnotationPattern(a, annotations, schema);
+                    }
+                }
+            }
         }
         return null;
+    }
+
+    private String resolveJavaTimePatternByAnnotationPattern(Annotated a, Annotation[] annotations, io.swagger.v3.oas.annotations.media.Schema schema) {
+        return Arrays.stream(annotations)
+                .filter(it -> it instanceof JsonFormat)
+                .findFirst()
+                .map(it -> (JsonFormat)it)
+                .map(JsonFormat::pattern)
+                .orElse(null);
     }
 
     protected Integer resolveMinProperties(Annotated a, Annotation[] annotations, io.swagger.v3.oas.annotations.media.Schema schema) {

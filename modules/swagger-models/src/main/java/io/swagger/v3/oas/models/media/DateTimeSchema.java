@@ -26,7 +26,7 @@ import java.util.Objects;
  * DateTimeSchema
  */
 
-public class DateTimeSchema extends Schema<OffsetDateTime> {
+public class DateTimeSchema extends Schema<String> {
 
     public DateTimeSchema() {
         super("string", "date-time");
@@ -50,15 +50,15 @@ public class DateTimeSchema extends Schema<OffsetDateTime> {
     }
 
     @Override
-    protected OffsetDateTime cast(Object value) {
+    protected String cast(Object value) {
         if (value != null) {
             try {
                 if (value instanceof Date) {
-                    return ((Date)value).toInstant().atOffset(ZoneOffset.UTC);
+                    return ((Date)value).toInstant().atOffset(ZoneOffset.UTC).toString();
                 } else if (value instanceof String) {
-                    return OffsetDateTime.parse((String)value);
+                    return (String) value;
                 } else if (value instanceof OffsetDateTime) {
-                    return (OffsetDateTime)value;
+                    return ((OffsetDateTime)value).toString();
                 }
             } catch (Exception e) {
             }
@@ -66,12 +66,12 @@ public class DateTimeSchema extends Schema<OffsetDateTime> {
         return null;
     }
 
-    public DateTimeSchema _enum(List<OffsetDateTime> _enum) {
+    public DateTimeSchema _enum(List<String> _enum) {
         super.setEnum(_enum);
         return this;
     }
 
-    public DateTimeSchema addEnumItem(OffsetDateTime _enumItem) {
+    public DateTimeSchema addEnumItem(String _enumItem) {
         super.addEnumItemObject(_enumItem);
         return this;
     }
